@@ -18,11 +18,14 @@ class TLDetector(object):
     def __init__(self):
         rospy.init_node('tl_detector')
 
+        self.SIMULATOR_GROUND_TRUTH = False # set True to use simulator ground truth
         self.pose = None
         self.waypoints = None
         self.camera_image = None
         self.lights = []
         self.waypoint_tree = None
+        self.config = yaml.load(rospy.get_param("/traffic_light_config"))
+        self.tl_classifier = TLClassifier(self.config['is_site'])
 
         sub1 = rospy.Subscriber('/current_pose', PoseStamped, self.pose_cb)
         sub2 = rospy.Subscriber('/base_waypoints', Lane, self.waypoints_cb)
@@ -115,19 +118,16 @@ class TLDetector(object):
 
         Returns:
             int: ID of traffic light color (specified in styx_msgs/TrafficLight)
-
         """
-        """
-        if(not self.has_image):
-            self.prev_light_loc = None
-            return False
-
-        cv_image = self.bridge.imgmsg_to_cv2(self.camera_image, "bgr8")
-
-        #Get classification
-        return self.light_classifier.get_classification(cv_image)
-        """
-        return light.state
+        if self.SIMULATOR_GROUND_TRUTH:
+            return light.state
+        else:      
+            if(not self.has_image):
+                self.prev_light_loc = None
+                return TrafficLight.UNKNOWN
+            cv_image = self.bridge.imgmsg_to_cv2(self.camera_image, "bgr8")
+            #Get classification
+            return self.tl_classifier.get_classification(cv_image)
 
     def process_traffic_lights(self):
         """Finds closest visible traffic light, if one exists, and determines its
@@ -159,6 +159,7 @@ class TLDetector(object):
             return line_wp_idx, state
         self.waypoints = None
         return -1, TrafficLight.UNKNOWN
+
 
 if __name__ == '__main__':
     try:
